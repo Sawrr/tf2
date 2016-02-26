@@ -8,7 +8,7 @@ public Plugin myinfo =
 	description = "Use /prefix <tag> to add your team's tag to the names of all players on your team.",
 	author = "Sawr",
 	version = "1.0",
-	url = ""
+	url = "https://github.com/Sawrr/tf2/tree/master/TeamPrefixes"
 };
 
 /* ================================================================================== */
