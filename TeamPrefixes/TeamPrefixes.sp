@@ -2,6 +2,8 @@
 #include <sdktools>
 #include <colors>
 
+// ====[ PLUGIN ]====================================================================
+
 public Plugin myinfo = {
 	name = "TeamPrefixes",
 	description = "Use /prefix <tag> to add your team's tag to the names of all players on your team.",
@@ -10,7 +12,7 @@ public Plugin myinfo = {
 	url = "https://github.com/Sawrr/tf2/tree/master/TeamPrefixes"
 };
 
-/* ================================================================================== */
+// ====[ VARIABLES ]=================================================================
 
 // Array of player names when they connect. Names may be up to 32 characters
 new String:nameArray[MAXPLAYERS + 1][32];
@@ -19,7 +21,7 @@ new String:nameArray[MAXPLAYERS + 1][32];
 new String:bluPrefix[7];
 new String:redPrefix[7];
 
-// Convars for mp_tournament and enable command
+// Convars for mp_tournament, plugin enabled
 ConVar g_hTournament = null;
 ConVar g_hPluginEnabled;
 
@@ -31,52 +33,63 @@ new UserMsg:g_umSayText2;
 
 // When true, the next name change will be hidden from chat
 new bool:hideNextNameChange = false;
+
+// Name changes are considered manual until told otherwise by prefix change
 new bool:manualNameChange = true;
 
-/* ================================================================================== */
+// ====[ PLUGIN FUNCTIONS ]==========================================================
 
-/**
- * Called on plugin start
+/* OnPluginStart()
  *
- */
-// Create /prefix <tag> or !prefix <tag> command
-// Disable command when game starts, enable when game ends
+ * Called when plugin is loaded
+ * ------------------------------------------------------------------------- */
 public void OnPluginStart() {
 	RegConsoleCmd("prefix", Command_Prefix);
 	g_hPluginEnabled = CreateConVar("sm_teamprefixes_enabled", "0", "Enables/disables team prefixes.", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_hPluginEnabled.AddChangeHook(OnConvarChange);
-	
+
 	g_hTournament = FindConVar("mp_tournament");
 	g_hTournament.AddChangeHook(OnConvarChange);
-	
+
 	HookEvent("teamplay_round_start", Disable);
 	HookEvent("tf_game_over", Enable);
-    HookEvent("teamplay_game_over", Enable);
-    RegServerCmd("mp_tournament_restart", Command_Restart);
-	
+	HookEvent("teamplay_game_over", Enable);
+	RegServerCmd("mp_tournament_restart", Command_Restart);
+
 	AddCommandListener(Command_JoinTeam, "jointeam")
-	
+
 	g_umSayText2 = GetUserMessageId("SayText2");
 	HookUserMessage(g_umSayText2, UserMessageHook, true);
-	
+
 	HookEvent("player_changename", OnNameChange);
-    
-    GetAllPlayerNames();
+
+	// Load names of all current players into nameArray
+	GetAllPlayerNames();
 }
 
+/* OnPluginEnd()
+ *
+ * Called when plugin is unloaded
+ * ------------------------------------------------------------------------- */
 public void OnPluginEnd() {
-    ClearAllPlayerNames();
+	ClearAllPlayerNames();
 }
 
-// Get connected player's names and store them in an array
-public void OnClientConnected(client)
-{
+/* OnClientConnected(client)
+ *
+ * Called when client connects. Adds client's name to nameArray
+ * @param client client who connected
+ * ------------------------------------------------------------------------- */
+public void OnClientConnected(client) {
 	new String:clientName[32];
 	GetClientName(client, clientName, 32);
 	nameArray[client] = clientName;
 }
 
-// Prefix changing is enabled before the round starts
+/* OnMapStart()
+ *
+ * Called when map starts. Resets prefixes
+ * ------------------------------------------------------------------------- */
 public void OnMapStart() {
 	g_hPluginEnabled.IntValue = 0;
 	roundEnabled = true;
@@ -84,10 +97,14 @@ public void OnMapStart() {
 	redPrefix = "";
 }
 
-/* ================================================================================== */
+// ====[ NAME UPDATING ]=============================================================
 
+/* GetAllPlayerNames()
+ *
+ * Add all currently connected player names to nameArray
+ * ------------------------------------------------------------------------- */
 public void GetAllPlayerNames() {
-    for( int i = 1; i < MaxClients + 1; i = i + 1 ) {
+	for( int i = 1; i < MaxClients + 1; i = i + 1 ) {
 		if(IsClientInGame(i)) {
 			new String:clientName[32];
 			GetClientName(i, clientName, 32);
@@ -96,23 +113,45 @@ public void GetAllPlayerNames() {
 	}
 }
 
+/* ClearAllPlayerNames()
+ *
+ * Removes prefixes from all names
+ * ------------------------------------------------------------------------- */
 public void ClearAllPlayerNames() {
-    bluPrefix = "";
+	bluPrefix = "";
 	redPrefix = "";
 	for( int i = 1; i < MaxClients + 1; i = i + 1) {
 		UpdateName(i);
 	}
 }
 
+/* OnConvarChange(ConVar convar, char[] oldValue, char[] newValue)
+ *
+ * Add all currently connected player names to nameArray
+ *
+ * @param convar convar that changed (sm_teamprefixes_enabled)
+ * @param oldValue previous value of convar
+ * @param newValue new value of convar
+ * ------------------------------------------------------------------------- */
 public void OnConvarChange(ConVar convar, char[] oldValue, char[] newValue) {
 	if(StringToInt(newValue) == 0 && StringToInt(oldValue) == 1) {
-        ClearAllPlayerNames();
+		ClearAllPlayerNames();
 	}
 	if(StringToInt(newValue) == 1 && StringToInt(oldValue) == 0) {
-        GetAllPlayerNames();
+		GetAllPlayerNames();
 	}
 }
 
+/* Command_JoinTeam(client, const String:command[], args)
+ *
+ * Called when a player tries to change team. If the plugin is active,
+ * create short timer that will update player's prefix. The timer is
+ * necessary because the game needs to process the team change first
+ *
+ * @param client client that changed team
+ * @param command[]
+ * @param args
+ * ------------------------------------------------------------------------- */
 public Action:Command_JoinTeam(client, const String:command[], args) {
 	g_hTournament = FindConVar("mp_tournament");
 	if (g_hTournament.BoolValue && g_hPluginEnabled.BoolValue && roundEnabled && IsClientInGame(client)) {
@@ -124,18 +163,37 @@ public Action:Command_JoinTeam(client, const String:command[], args) {
 	return Plugin_Continue;
 }
 
+/* ChangeTeamTimer(Handle timer, client)
+ *
+ * Called after client has changed teams
+ *
+ * @param timer
+ * @param client client who changed teams
+ * ------------------------------------------------------------------------- */
 public Action:ChangeTeamTimer(Handle timer, client) {
 	UpdateName(client);
 }
 
-/* ================================================================================== */
+// ====[ USER NAME CHANGE ]==========================================================
 
+/* UserMessageHook(UserMsg:msg_hd, Handle:bf, const players[], playersNum, bool:reliable, bool:init)
+ *
+ * Called when player's name changes, either manually or via the plugin.
+ * If the name change was manual, display it. Otherwise, do not
+ *
+ * @param msg_hd
+ * @param bf
+ * @param players[]
+ * @param playersNum
+ * @param reliable
+ * @param init
+ * ------------------------------------------------------------------------- */
 public Action:UserMessageHook(UserMsg:msg_hd, Handle:bf, const players[], playersNum, bool:reliable, bool:init) {
 	decl String:_sMessage[96];
 	BfReadString(bf, _sMessage, sizeof(_sMessage));
 	BfReadString(bf, _sMessage, sizeof(_sMessage));
-	
-	if (StrContains(_sMessage, "Name_Change") != -1  && hideNextNameChange) {	
+
+	if (StrContains(_sMessage, "Name_Change") != -1  && hideNextNameChange) {
 		hideNextNameChange = false;
 		for(int i = 1; i <= MaxClients; i++) {
 			if (IsClientInGame(i)) {
@@ -146,6 +204,15 @@ public Action:UserMessageHook(UserMsg:msg_hd, Handle:bf, const players[], player
 	return Plugin_Continue;
 }
 
+/* OnNameChange(Handle:event, const String:name[], bool:dontBroadcast)
+ *
+ * Called when player changes name. If change was manual, create timer
+ * to update name in nameArray
+ *
+ * @param event name change event
+ * @param name[]
+ * @param dontBroadcast
+ * ------------------------------------------------------------------------- */
 public Action:OnNameChange(Handle:event, const String:name[], bool:dontBroadcast) {
 	if (manualNameChange == true) {
 		new client = GetClientOfUserId(GetEventInt(event, "userid"));
@@ -155,15 +222,31 @@ public Action:OnNameChange(Handle:event, const String:name[], bool:dontBroadcast
 	}
 }
 
+/* ChangeNameTimer(Handle timer, client)
+ *
+ * Called after client has manually changed names.
+ * Updates their name in nameArray
+ *
+ * @param timer
+ * @param client client who changed teams
+ * ------------------------------------------------------------------------- */
 public Action:ChangeNameTimer(Handle timer, client) {
 	new String:clientName[32];
 	GetClientName(client, clientName, 32);
 	nameArray[client] = clientName;
 }
 
-/* ================================================================================== */
+// ====[ ROUND ENABLE/DISABLE ]======================================================
 
-// Check if both teams are readied up to disable prefix changing
+/* Disable(Handle: event, const String: name[], bool: dontBroadcast)
+ *
+ * Called when a round starts. If both teams are ready,
+ * disables prefix changing during the match
+ *
+ * @param event round start event
+ * @param name[]
+ * @param dontBroadcast
+ * ------------------------------------------------------------------------- */
 public Action:Disable(Handle: event, const String: name[], bool: dontBroadcast) {
 	new redReady = GameRules_GetProp("m_bTeamReady",1,2);
 	new bluReady = GameRules_GetProp("m_bTeamReady",1,3);
@@ -173,19 +256,39 @@ public Action:Disable(Handle: event, const String: name[], bool: dontBroadcast) 
 	}
 }
 
-// Enable prefix changing
+/* Enable(Handle: event, const String: name[], bool: dontBroadcast)
+ *
+ * Called when a round ends. Enables prefix changing
+ *
+ * @param event round end event
+ * @param name[]
+ * @param dontBroadcast
+ * ------------------------------------------------------------------------- */
 public Action:Enable(Handle: event, const String: name[], bool: dontBroadcast) {
 	roundEnabled = true;
 }
 
-/* ================================================================================== */
-
+/* Command_Restart(args)
+ *
+ * Called when a tournament mode is restarted. Enables prefix changing
+ *
+ * @param args
+ * ------------------------------------------------------------------------- */
 public Action:Command_Restart(args) {
-    roundEnabled = true;
+	roundEnabled = true;
 }
 
-// Command for /prefix <tag> or !prefix <tag>
-// makes sure tournament mode is roundEnabled and checks player's team
+// ====[ PREFIX ]====================================================================
+
+/* Command_Prefix(int client, int args)
+ *
+ * Called when a user types /prefix <tag> or !prefix <tag>
+ * If plugin is active, set the prefix. Otherwise explain
+ * why the plugin is not active
+ *
+ * @param client user who typed the command
+ * @param args desired prefix
+ * ------------------------------------------------------------------------- */
 public Action:Command_Prefix(int client, int args) {
 	g_hTournament = FindConVar("mp_tournament");
 	if (g_hTournament != null) {
@@ -194,7 +297,7 @@ public Action:Command_Prefix(int client, int args) {
 				if (g_hTournament.BoolValue) {
 					if (roundEnabled) {
 						SetPrefix(client, args);
-					} else {						
+					} else {
 						PrintToChat(client, "TeamPrefixes is disabled during the match.");
 					}
 				} else {
@@ -207,13 +310,18 @@ public Action:Command_Prefix(int client, int args) {
 	}
 }
 
-/* ================================================================================== */
-
-// Get prefix from the command
+/* SetPrefix(int client, int args)
+ *
+ * Sets prefix for team of client who changed
+ * and updates ALL users prefixes
+ *
+ * @param client user who set the prefix
+ * @param args desired prefix
+ * ------------------------------------------------------------------------- */
 public Action:SetPrefix(int client, int args) {
 	new String:name[7];
 	GetCmdArgString(name, sizeof(name));
-	
+
 	if (GetClientTeam(client) == 3) {
 		bluPrefix = name;
 	} else if (GetClientTeam(client) == 2) {
@@ -221,12 +329,12 @@ public Action:SetPrefix(int client, int args) {
 	} else {
 		return Plugin_Continue;
 	}
-	
+
 	new String:clientName[62];
 	GetClientName(client, clientName, sizeof(clientName));
-	
+
 	new String:changeString[25];
-	
+
 	if (StrEqual(name,""))
 	{
 		if (GetClientTeam(client) == 3) {
@@ -245,24 +353,29 @@ public Action:SetPrefix(int client, int args) {
 			StrCat(clientName, sizeof(clientName), changeString);
 			StrCat(clientName, sizeof(clientName), redPrefix)
 		}
-	}	
-	
+	}
+
 	CPrintToChatAllEx(client, "{teamcolor}%s", clientName);
-	
+
 	for (int i = 1; i < MaxClients + 1; i = i + 1) {
-		//if(GetClientTeam(i) == GetClientTeam(client)) {
-			UpdateName(i);
-		//}
+		UpdateName(i);
 	}
 	return Plugin_Continue;
 }
 
-// Update player's name
+/* UpdateName(client)
+ *
+ * Called when a user types /prefix <tag> or !prefix <tag>
+ * If plugin is active, set the prefix. Otherwise explain
+ * why the plugin is not active
+ *
+ * @param client user whose name will be updated
+ * ------------------------------------------------------------------------- */
 public void UpdateName(client) {
 	if (IsClientInGame(client)) {
 		new String:prefix[32];
 		new String:playerName[32];
-		
+
 		if (GetClientTeam(client) == 3) {
 			prefix = bluPrefix;
 		} else if (GetClientTeam(client) == 2) {
@@ -270,15 +383,15 @@ public void UpdateName(client) {
 		} else {
 			prefix = ""
 		}
-		
-		// Reset player name
+
+		// Reset player name first...
 		hideNextNameChange = true;
 		manualNameChange = false;
 		SetClientName(client, nameArray[client]);
-		
+
 		g_hTournament = FindConVar("mp_tournament");
 		if (g_hTournament.BoolValue && g_hPluginEnabled.BoolValue) {
-			// Set new player name
+			// ... now set new player name
 			GetClientName(client, playerName, sizeof(playerName));
 			StrCat(prefix, sizeof(prefix), " ");
 			StrCat(prefix, sizeof(prefix), playerName);
