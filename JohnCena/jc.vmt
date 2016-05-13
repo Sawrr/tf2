@@ -1,0 +1,16 @@
+"UnlitGeneric"
+{
+"$basetexture" "custom/jc.vtf"
+"startframe" "1"
+"endframe" "125"
+
+"Proxies" 
+{ 
+"AnimatedTexture" 
+{ 
+"animatedTextureVar" "$basetexture" 
+"animatedTextureFrameNumVar" "$frame" 
+"animatedTextureFrameRate" "25"
+}
+} 
+}
