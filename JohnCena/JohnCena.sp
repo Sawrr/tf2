@@ -28,7 +28,7 @@ public Action Command_JC(args) {
 public Action OverlayStart(Handle timer) {
 	for (int i = 1; i < MaxClients + 1; i++) {
 		if (IsClientInGame(i)) {
-            ClientCommand(i, "r_screenoverlay custom/jcm.vmt")
+            ClientCommand(i, "r_screenoverlay custom/jc.vmt")
 		}
 	}
 }
