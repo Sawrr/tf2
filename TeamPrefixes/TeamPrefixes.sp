@@ -8,22 +8,31 @@ public Plugin myinfo = {
 	name = "TeamPrefixes",
 	description = "Use /prefix <tag> to add your team's tag to the names of all players on your team.",
 	author = "Sawr",
-	version = "1.0",
+	version = "1.1",
 	url = "https://github.com/Sawrr/tf2/tree/master/TeamPrefixes"
 };
 
+// ====[ CONSTANTS ]=================================================================
+
+const int NAME_MAX_LENGTH = 32;
+const int PREFIX_MAX_LENGTH = 7;
+
+const int BLU_ID = 3;
+const int RED_ID = 2;
+
 // ====[ VARIABLES ]=================================================================
 
-// Array of player names when they connect. Names may be up to 32 characters
-new String:nameArray[MAXPLAYERS + 1][32];
+// Array of player names when they connect. Names may be up to NAME_MAX_LENGTH characters
+new String:nameArray[MAXPLAYERS][NAME_MAX_LENGTH];
 
-// Arrays for RED and BLU prefixes. 7 character maximum
-new String:bluPrefix[7];
-new String:redPrefix[7];
+// Arrays for RED and BLU prefixes. PREFIX_MAX_LENGTH character maximum
+new String:bluPrefix[PREFIX_MAX_LENGTH];
+new String:redPrefix[PREFIX_MAX_LENGTH];
 
-// Convars for mp_tournament, plugin enabled
+// Convars for mp_tournament, plugin enabled, disable on map change
 ConVar g_hTournament = null;
 ConVar g_hPluginEnabled;
+ConVar g_hDisableOnMapChange;
 
 // Prefix changing is allowed before and after games
 new bool:roundEnabled = true;
@@ -45,9 +54,12 @@ new bool:manualNameChange = true;
  * ------------------------------------------------------------------------- */
 public void OnPluginStart() {
 	RegConsoleCmd("prefix", Command_Prefix);
+    
 	g_hPluginEnabled = CreateConVar("sm_teamprefixes_enabled", "0", "Enables/disables team prefixes.", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_hPluginEnabled.AddChangeHook(OnConvarChange);
 
+	g_hDisableOnMapChange = CreateConVar("sm_teamprefixes_mapchange_disabled", "0", "Disables the plugin on map change", FCVAR_NONE, true, 0.0, true, 1.0);
+	
 	g_hTournament = FindConVar("mp_tournament");
 	g_hTournament.AddChangeHook(OnConvarChange);
 
@@ -81,8 +93,8 @@ public void OnPluginEnd() {
  * @param client client who connected
  * ------------------------------------------------------------------------- */
 public void OnClientConnected(client) {
-	new String:clientName[32];
-	GetClientName(client, clientName, 32);
+	new String:clientName[NAME_MAX_LENGTH];
+	GetClientName(client, clientName, NAME_MAX_LENGTH);
 	nameArray[client] = clientName;
 }
 
@@ -91,7 +103,9 @@ public void OnClientConnected(client) {
  * Called when map starts. Resets prefixes
  * ------------------------------------------------------------------------- */
 public void OnMapStart() {
-	g_hPluginEnabled.IntValue = 0;
+	if (g_hDisableOnMapChange.IntValue == 1) {
+		g_hPluginEnabled.IntValue = 0;
+	}
 	roundEnabled = true;
 	bluPrefix = "";
 	redPrefix = "";
@@ -104,10 +118,10 @@ public void OnMapStart() {
  * Add all currently connected player names to nameArray
  * ------------------------------------------------------------------------- */
 public void GetAllPlayerNames() {
-	for( int i = 1; i < MaxClients + 1; i = i + 1 ) {
-		if(IsClientInGame(i)) {
-			new String:clientName[32];
-			GetClientName(i, clientName, 32);
+	for (int i = 1; i <= MaxClients; i++) {
+		if (IsClientInGame(i)) {
+			new String:clientName[NAME_MAX_LENGTH];
+			GetClientName(i, clientName, NAME_MAX_LENGTH);
 			nameArray[i] = clientName;
 		}
 	}
@@ -120,7 +134,7 @@ public void GetAllPlayerNames() {
 public void ClearAllPlayerNames() {
 	bluPrefix = "";
 	redPrefix = "";
-	for( int i = 1; i < MaxClients + 1; i = i + 1) {
+	for (int i = 1; i <= MaxClients; i++) {
 		UpdateName(i);
 	}
 }
@@ -134,10 +148,10 @@ public void ClearAllPlayerNames() {
  * @param newValue new value of convar
  * ------------------------------------------------------------------------- */
 public void OnConvarChange(ConVar convar, char[] oldValue, char[] newValue) {
-	if(StringToInt(newValue) == 0 && StringToInt(oldValue) == 1) {
+	if (StringToInt(newValue) == 0 && StringToInt(oldValue) == 1) {
 		ClearAllPlayerNames();
 	}
-	if(StringToInt(newValue) == 1 && StringToInt(oldValue) == 0) {
+	if (StringToInt(newValue) == 1 && StringToInt(oldValue) == 0) {
 		GetAllPlayerNames();
 	}
 }
@@ -193,9 +207,9 @@ public Action:UserMessageHook(UserMsg:msg_hd, Handle:bf, const players[], player
 	BfReadString(bf, _sMessage, sizeof(_sMessage));
 	BfReadString(bf, _sMessage, sizeof(_sMessage));
 
-	if (StrContains(_sMessage, "Name_Change") != -1  && hideNextNameChange) {
+	if (StrContains(_sMessage, "Name_Change") != -1	 && hideNextNameChange) {
 		hideNextNameChange = false;
-		for(int i = 1; i <= MaxClients; i++) {
+		for (int i = 1; i <= MaxClients; i++) {
 			if (IsClientInGame(i)) {
 				return Plugin_Handled;
 			}
@@ -225,15 +239,16 @@ public Action:OnNameChange(Handle:event, const String:name[], bool:dontBroadcast
 /* ChangeNameTimer(Handle timer, client)
  *
  * Called after client has manually changed names.
- * Updates their name in nameArray
+ * Updates their name in nameArray and then applies prefix
  *
  * @param timer
  * @param client client who changed teams
  * ------------------------------------------------------------------------- */
 public Action:ChangeNameTimer(Handle timer, client) {
-	new String:clientName[32];
-	GetClientName(client, clientName, 32);
+	new String:clientName[NAME_MAX_LENGTH];
+	GetClientName(client, clientName, NAME_MAX_LENGTH);
 	nameArray[client] = clientName;
+	UpdateName(client);
 }
 
 // ====[ ROUND ENABLE/DISABLE ]======================================================
@@ -248,8 +263,8 @@ public Action:ChangeNameTimer(Handle timer, client) {
  * @param dontBroadcast
  * ------------------------------------------------------------------------- */
 public Action:Disable(Handle: event, const String: name[], bool: dontBroadcast) {
-	new redReady = GameRules_GetProp("m_bTeamReady",1,2);
-	new bluReady = GameRules_GetProp("m_bTeamReady",1,3);
+	new redReady = GameRules_GetProp("m_bTeamReady", 1, RED_ID);
+	new bluReady = GameRules_GetProp("m_bTeamReady", 1, BLU_ID);
 
 	if (bluReady && redReady) {
 		roundEnabled = false;
@@ -319,12 +334,12 @@ public Action:Command_Prefix(int client, int args) {
  * @param args desired prefix
  * ------------------------------------------------------------------------- */
 public Action:SetPrefix(int client, int args) {
-	new String:name[7];
+	new String:name[PREFIX_MAX_LENGTH];
 	GetCmdArgString(name, sizeof(name));
 
-	if (GetClientTeam(client) == 3) {
+	if (GetClientTeam(client) == BLU_ID) {
 		bluPrefix = name;
-	} else if (GetClientTeam(client) == 2) {
+	} else if (GetClientTeam(client) == RED_ID) {
 		redPrefix = name;
 	} else {
 		return Plugin_Continue;
@@ -337,18 +352,18 @@ public Action:SetPrefix(int client, int args) {
 
 	if (StrEqual(name,""))
 	{
-		if (GetClientTeam(client) == 3) {
+		if (GetClientTeam(client) == BLU_ID) {
 			changeString = " cleared BLU's prefix";
-		} else if (GetClientTeam(client) == 2) {
+		} else if (GetClientTeam(client) == RED_ID) {
 			changeString = " cleared RED's prefix";
 		}
 		StrCat(clientName, sizeof(clientName), changeString);
 	} else {
-		if (GetClientTeam(client) == 3) {
+		if (GetClientTeam(client) == BLU_ID) {
 			changeString = " changed BLU's prefix to ";
 			StrCat(clientName, sizeof(clientName), changeString);
 			StrCat(clientName, sizeof(clientName), bluPrefix)
-		} else if (GetClientTeam(client) == 2) {
+		} else if (GetClientTeam(client) == RED_ID) {
 			changeString = " changed RED's prefix to ";
 			StrCat(clientName, sizeof(clientName), changeString);
 			StrCat(clientName, sizeof(clientName), redPrefix)
@@ -357,7 +372,7 @@ public Action:SetPrefix(int client, int args) {
 
 	CPrintToChatAllEx(client, "{teamcolor}%s", clientName);
 
-	for (int i = 1; i < MaxClients + 1; i = i + 1) {
+	for (int i = 1; i <= MaxClients; i++) {
 		UpdateName(i);
 	}
 	return Plugin_Continue;
@@ -373,12 +388,12 @@ public Action:SetPrefix(int client, int args) {
  * ------------------------------------------------------------------------- */
 public void UpdateName(client) {
 	if (IsClientInGame(client)) {
-		new String:prefix[32];
-		new String:playerName[32];
+		new String:prefix[NAME_MAX_LENGTH];
+		new String:playerName[NAME_MAX_LENGTH];
 
-		if (GetClientTeam(client) == 3) {
+		if (GetClientTeam(client) == BLU_ID) {
 			prefix = bluPrefix;
-		} else if (GetClientTeam(client) == 2) {
+		} else if (GetClientTeam(client) == RED_ID) {
 			prefix = redPrefix;
 		} else {
 			prefix = ""
