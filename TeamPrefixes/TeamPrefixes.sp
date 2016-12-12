@@ -30,9 +30,9 @@ new String:bluPrefix[PREFIX_MAX_LENGTH];
 new String:redPrefix[PREFIX_MAX_LENGTH];
 
 // Convars for mp_tournament, plugin enabled, disable on map change
-ConVar g_hTournament = null;
-ConVar g_hPluginEnabled;
-ConVar g_hDisableOnMapChange;
+ConVar g_Tournament = null;
+ConVar g_PluginEnabled;
+ConVar g_DisableOnMapChange;
 
 // Prefix changing is allowed before and after games
 new bool:roundEnabled = true;
@@ -55,13 +55,13 @@ new bool:manualNameChange = true;
 public void OnPluginStart() {
 	RegConsoleCmd("prefix", Command_Prefix);
     
-	g_hPluginEnabled = CreateConVar("sm_teamprefixes_enabled", "0", "Enables/disables team prefixes.", FCVAR_NONE, true, 0.0, true, 1.0);
-	g_hPluginEnabled.AddChangeHook(OnConvarChange);
+	g_PluginEnabled = CreateConVar("sm_teamprefixes_enabled", "0", "Enables/disables team prefixes.", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_PluginEnabled.AddChangeHook(OnConvarChange);
 
-	g_hDisableOnMapChange = CreateConVar("sm_teamprefixes_mapchange_disabled", "0", "Disables the plugin on map change", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_DisableOnMapChange = CreateConVar("sm_teamprefixes_mapchange_disabled", "0", "Disables the plugin on map change", FCVAR_NONE, true, 0.0, true, 1.0);
 	
-	g_hTournament = FindConVar("mp_tournament");
-	g_hTournament.AddChangeHook(OnConvarChange);
+	g_Tournament = FindConVar("mp_tournament");
+	g_Tournament.AddChangeHook(OnConvarChange);
 
 	HookEvent("teamplay_round_start", Disable);
 	HookEvent("tf_game_over", Enable);
@@ -103,8 +103,8 @@ public void OnClientConnected(client) {
  * Called when map starts. Resets prefixes
  * ------------------------------------------------------------------------- */
 public void OnMapStart() {
-	if (g_hDisableOnMapChange.IntValue == 1) {
-		g_hPluginEnabled.IntValue = 0;
+	if (g_DisableOnMapChange.IntValue == 1) {
+		g_PluginEnabled.IntValue = 0;
 	}
 	roundEnabled = true;
 	bluPrefix = "";
@@ -167,8 +167,8 @@ public void OnConvarChange(ConVar convar, char[] oldValue, char[] newValue) {
  * @param args
  * ------------------------------------------------------------------------- */
 public Action:Command_JoinTeam(client, const String:command[], args) {
-	g_hTournament = FindConVar("mp_tournament");
-	if (g_hTournament.BoolValue && g_hPluginEnabled.BoolValue && roundEnabled && IsClientInGame(client)) {
+	g_Tournament = FindConVar("mp_tournament");
+	if (g_Tournament.BoolValue && g_PluginEnabled.BoolValue && roundEnabled && IsClientInGame(client)) {
 		if (IsClientInGame(client)) {
 			CreateTimer(0.1, ChangeTeamTimer, client);
 		}
@@ -305,11 +305,11 @@ public Action:Command_Restart(args) {
  * @param args desired prefix
  * ------------------------------------------------------------------------- */
 public Action:Command_Prefix(int client, int args) {
-	g_hTournament = FindConVar("mp_tournament");
-	if (g_hTournament != null) {
+	g_Tournament = FindConVar("mp_tournament");
+	if (g_Tournament != null) {
 		if (IsClientInGame(client)) {
-			if (g_hPluginEnabled.BoolValue) {
-				if (g_hTournament.BoolValue) {
+			if (g_PluginEnabled.BoolValue) {
+				if (g_Tournament.BoolValue) {
 					if (roundEnabled) {
 						SetPrefix(client, args);
 					} else {
@@ -404,8 +404,8 @@ public void UpdateName(client) {
 		manualNameChange = false;
 		SetClientName(client, nameArray[client]);
 
-		g_hTournament = FindConVar("mp_tournament");
-		if (g_hTournament.BoolValue && g_hPluginEnabled.BoolValue) {
+		g_Tournament = FindConVar("mp_tournament");
+		if (g_Tournament.BoolValue && g_PluginEnabled.BoolValue) {
 			// ... now set new player name
 			GetClientName(client, playerName, sizeof(playerName));
 			StrCat(prefix, sizeof(prefix), " ");
