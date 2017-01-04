@@ -1,6 +1,36 @@
 # tf2
 Sourcemod plugins for Team Fortress 2
 
+## AdvancedPause
+
+### Description
+Extension of F2's Pause plugin that automatically pauses the game when a player disconnects. Allows for players to reconnect in a similar state as when they DC'd. 
+
+#### v1.0  
+Initial upload
+
+### Installation
+Place AdvancedPause.smx in /tf/addons/sourcemod/plugins/
+
+## GG Concede
+
+### Description
+Allows players to use !gg or /gg command to concede a match. The match will end after 10 seconds unless someone on the team enters !cancel or /cancel to stop the countdown.
+Enable or disable with gg\_enabled
+
+ConVars for customization
+gg\_enabled - Sets whether calling gg is enabled.
+gg\_winnerconcede - Sets whether the winning team can call gg.
+gg\_winthreshold - Sets the number of round wins a team must win before their opponents may call gg.
+gg\_windifference - Sets the difference in round wins required for the losing team to call gg.
+gg\_timeleft - Sets the number of minutes left in the game before a team can call gg.
+
+### Installation
+Place ggconcede.smx in /tf/addons/sourcemod/plugins/
+
+#### v1.0  
+Initial upload
+
 ## TeamPrefixes
 
 ### Description
