@@ -146,7 +146,7 @@ public Plugin:myinfo =
 	name = "AdvancedPause",
 	author = "Sawr",
 	description = "Pauses game when player disconnects and allows for reconnecting.",
-	version = "1.0.0",
+	version = "1.0.1",
 	url = "https://github.com/Sawrr/tf2/tree/master/AdvancedPause",
 }
 
@@ -703,6 +703,14 @@ public void OnGameFrame()
 		int client = g_iLoadPlayerNextTick;
 		g_iLoadPlayerNextTick = 0;
 		LoadClient( client );
+	}
+	
+	// Disable plugin when map time runs out
+	int time;
+	GetMapTimeLeft( time );
+	if ( time == 0 ) {
+		// Disable
+		OnMapStart();
 	}
 }
 
