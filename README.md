@@ -6,7 +6,10 @@ Sourcemod plugins for Team Fortress 2
 ### Description
 Extension of F2's Pause plugin that automatically pauses the game when a player disconnects. Allows for players to reconnect in a similar state as when they DC'd. 
 
-#### v1.0  
+#### v1.0.1
+Fixed issue where plugin did not disable after matches ending due to time limit
+
+#### v1.0.0  
 Initial upload
 
 ### Installation
@@ -28,7 +31,7 @@ gg\_timeleft - Sets the number of minutes left in the game before a team can cal
 ### Installation
 Place ggconcede.smx in /tf/addons/sourcemod/plugins/
 
-#### v1.0  
+#### v1.0.0  
 Initial upload
 
 ## TeamPrefixes
