@@ -22,11 +22,17 @@ Allows players to use !gg or /gg command to concede a match. The match will end 
 Enable or disable with gg\_enabled
 
 ConVars for customization
+
 gg\_enabled - Sets whether calling gg is enabled.
+
 gg\_winnerconcede - Sets whether the winning team can call gg.
+
 gg\_winthreshold - Sets the number of round wins a team must win before their opponents may call gg.
+
 gg\_windifference - Sets the difference in round wins required for the losing team to call gg.
+
 gg\_timeleft - Sets the number of minutes left in the game before a team can call gg.
+
 
 ### Installation
 Place ggconcede.smx in /tf/addons/sourcemod/plugins/
