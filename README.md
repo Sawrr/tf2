@@ -25,6 +25,8 @@ ConVars for customization
 
 gg\_enabled - Sets whether calling gg is enabled.
 
+gg\_vote - Sets whether a team must vote on gg.
+
 gg\_winnerconcede - Sets whether the winning team can call gg.
 
 gg\_winthreshold - Sets the number of round wins a team must win before their opponents may call gg.
@@ -36,6 +38,9 @@ gg\_timeleft - Sets the number of minutes left in the game before a team can cal
 
 ### Installation
 Place ggconcede.smx in /tf/addons/sourcemod/plugins/
+
+#### v1.1.0  
+Added gg_vote ConVar and voting functionality. Fixed similar bug in which plugin would stay active after games ending due to time limit.
 
 #### v1.0.0  
 Initial upload
